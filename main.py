@@ -9,6 +9,7 @@ from heapq import heappop, heappush
 targetRepo = os.environ.get("TARGET_REPO", "fortheusers/switch-hbas-repo")
 
 ignoreData = {}
+existingPRs = set()
 ghUser = "DragoniteBot"
 
 def fetchIgnoreData():
@@ -49,7 +50,7 @@ def editDistance(word1, word2):
 def cloneRepo():
     if os.path.exists("metadata-repo"):
         os.system("rm -rf metadata-repo")
-        print("Removed existing metadata-repo directory.")
+        print("Removed existing metadata-repo directory")
     os.system(f"git clone https://github.com/{targetRepo}.git metadata-repo")
 
     # identify ourselves to git
@@ -100,7 +101,22 @@ def getGHInfo(url):
         return None, None
     return parts[3], parts[4]
 
+def fetchExistingPRs():
+    global existingPRs
+    existingPRs.clear()
+    # fetch all open PRs from the target repo
+    url = f"https://api.github.com/repos/{targetRepo}/pulls?state=open"
+    headers = {
+        "Authorization": f"token {os.environ.get('GH_TOKEN', '')}",
+    }
+    resp = requests.get(url, headers=headers)
+    prData = resp.json()
+    for pr in prData:
+        title = pr.get("title", "")
+        existingPRs.add(title)
+
 def checkForUpdates():
+    fetchExistingPRs()
     # for each of our packages, check their Github repo
     # for releases, and if the version isn't ignored and
     # is different than our existing one, create a PR for it
@@ -112,7 +128,7 @@ def checkForUpdates():
             curVersion = cleanVersion(pkgbuild["info"].get("version", ""))
             ghRepo, ghName = getGHInfo(pkgbuild["info"].get("url", ""))
             if not ghRepo or not ghName:
-                print(f"Package {package} does not have a valid GitHub URL.")
+                print(f"Package {package} does not have a valid GitHub URL")
                 continue
             # fetch the latest release data from GitHub
             releaseUrl = f"https://api.github.com/repos/{ghRepo}/{ghName}/releases/latest"
@@ -127,9 +143,16 @@ def checkForUpdates():
             # check if the version is the same, or ignored
             tagName = cleanVersion(releaseData.get("tag_name", ""))
             if tagName == curVersion or ignoreData.get(package, "") == tagName:
-                print(f"No update for {package}, current version is {curVersion}, latest is {tagName}.")
+                print(f"No update for {package}, current version is {curVersion}, latest is {tagName}")
                 continue
-            print(f"New update found for {package}: {curVersion} -> {tagName}.")
+            # before we proceed, if we already have a PR with the exact
+            # title that we _would_ create, skip to prevent flooding with dupes
+            title = makeCommitMessage(package, tagName)
+            if title in existingPRs:
+                print(f"Skipping {package}, PR '{title}' already exists")
+                continue
+            print(f"New update found for {package}: {curVersion} -> {tagName}")
+            time.sleep(100)
             # create a PR for this package
             createPR(package, releaseData)
 
@@ -142,7 +165,7 @@ def createPR(package, releaseData):
     version = cleanVersion(releaseData.get("tag_name", ""))
 
     if not version:
-        print(f"Package {package} has no valid version in the release data.")
+        print(f"Package {package} has no valid version in the release data")
         return
 
     # check if the package exists first
