@@ -3,8 +3,10 @@
 
 import os, time, json, math
 import requests
+import subprocess
 from collections import defaultdict
 from heapq import heappop, heappush
+import re
 
 targetRepo = os.environ.get("TARGET_REPO", "fortheusers/switch-hbas-repo")
 
@@ -83,8 +85,10 @@ def cleanVersion(version):
     return version.strip("-")
 
 def stripMarkdown(text):
-    # TODO: Remove certain markdown symbols, and the word changelog
-    return text
+    text = text.replace("*", "").replace("`", "").replace("~", "").replace("#", "")
+    # extract out links, [text](url) -> text: url
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1: \2', text)
+    return text.strip()
 
 def escapeNewlines(text):
     # HBAS expects newlines to be represented as "\\n"
@@ -153,7 +157,6 @@ def checkForUpdates():
                 print(f"Skipping {package}, PR '{title}' already exists")
                 continue
             print(f"New update found for {package}: {curVersion} -> {tagName}")
-            time.sleep(100)
             # create a PR for this package
             createPR(package, releaseData)
     os.chdir("../..")
@@ -214,14 +217,20 @@ def createPR(package, releaseData):
     
     message = makeCommitMessage(package, version)
     os.system("git add .")
-    os.system(f"git commit -m '{message}'")
+    os.system(f"git commit -m \"{message}\"")
 
     # push our actual branch and create a PR with the GH CLI
     os.system("git push dragonite HEAD --force")
     time.sleep(2)
     url = releaseData["html_url"]
-    repo = targetRepo.split("/")[-1]
-    os.system(f"gh pr create --title '{message}' --body 'GH Release: {url}\n\nChanges:\n```\n{changelog}\n```' --base main --head {ghUser}:{package}-{version} --repo {targetRepo}")
+    subprocess.run([
+        "gh", "pr", "create",
+        "--title", message,
+        "--body", f"GH Release: {url}\n\nChanges:\n```\n{changelog}\n```",
+        "--base", "main",
+        "--head", f"{ghUser}:{package}-{version}",
+        "--repo", targetRepo
+    ], check=True)
 
 
 # set up our env variables in memory
