@@ -1,0 +1,8 @@
+services:
+  update-checker:
+    build: .
+    environment:
+      - GH_TOKEN=${GH_TOKEN}
+      - TARGET_REPO=${TARGET_REPO}
+    volumes:
+      - .:/code
