@@ -66,6 +66,7 @@ def resetAndRefreshRepo():
     os.chdir("metadata-repo")
     os.system("git reset --hard HEAD")
     os.system("git checkout main")
+    os.system("git reset --hard HEAD")
     os.system("git pull")
     os.chdir("..")
 
@@ -155,6 +156,7 @@ def checkForUpdates():
             time.sleep(100)
             # create a PR for this package
             createPR(package, releaseData)
+    os.chdir("../..")
 
 def makeCommitMessage(package, version):
     return f"[auto] Update {package} to {version}"
