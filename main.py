@@ -9,6 +9,7 @@ from heapq import heappop, heappush
 targetRepo = os.environ.get("TARGET_REPO", "fortheusers/switch-hbas-repo")
 
 ignoreData = {}
+ghUser = "DragoniteBot"
 
 def fetchIgnoreData():
     # Appstore hosts a cross-repo JSON of which version tags to ignore
@@ -55,6 +56,9 @@ def cloneRepo():
     os.chdir("metadata-repo")
     os.system("git config user.name 'Dragonite'")
     os.system("git config user.email 'fight@fortheusers.org'")
+    token = os.environ.get("GH_TOKEN", "")
+    repo = targetRepo.split("/")[-1]
+    os.system(f"git remote add dragonite https://{token}@github.com/{ghUser}/{repo}.git")
     os.chdir("..")
 
 def resetAndRefreshRepo():
@@ -129,6 +133,9 @@ def checkForUpdates():
             # create a PR for this package
             createPR(package, releaseData)
 
+def makeCommitMessage(package, version):
+    return f"[auto] Update {package} to {version}"
+
 # this command assumes that we are in the metadata-repo already
 def createPR(package, releaseData):
     changelog = stripMarkdown(releaseData.get("body", ""))
@@ -180,11 +187,22 @@ def createPR(package, releaseData):
     with open(f"{package}/pkgbuild.json", "w") as f:
         f.write(json.dumps(pkgbuild, indent=4, ensure_ascii=False))
     
+    message = makeCommitMessage(package, version)
     os.system("git add .")
-    os.system(f"git commit -m '[auto] Update {package} to {version}'")
+    os.system(f"git commit -m '{message}'")
 
-    # push our actual branch
-    # os.system("git push origin HEAD")
+    # push our actual branch and create a PR with the GH CLI
+    os.system("git push dragonite HEAD --force")
+    time.sleep(2)
+    url = releaseData["html_url"]
+    repo = targetRepo.split("/")[-1]
+    os.system(f"gh pr create --title '{message}' --body 'GH Release: {url}\n\nChanges:\n```\n{changelog}\n```' --base main --head {ghUser}:{package}-{version} --repo {targetRepo}")
+
+
+# set up our env variables in memory
+for line in open(".env", "r"):
+    key, value = line.strip().split("=", 1)
+    os.environ[key] = value
 
 fetchIgnoreData()
 cloneRepo() # every start, clone the repo new
