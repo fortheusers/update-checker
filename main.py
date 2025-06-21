@@ -85,7 +85,19 @@ def cleanVersion(version):
     return version.strip("-")
 
 def stripMarkdown(text):
+    if not text:
+        return ""
+    # chop off 'Full Changelog' (GH appends on some releases)
+    match = "Full Changelog: https://github.com"
+    if text.find(match) >= 0:
+        text = text[:text.find(match)]
+    # convert asterisks with a space after to dashes
+    # (GH uses * for bullets in some contexts)
+    text = re.sub(r'\* ', '- ', text)
+    # remove any other .md formatting
     text = text.replace("*", "").replace("`", "").replace("~", "").replace("#", "")
+    # if there's an image, just remove it too
+    text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
     # extract out links, [text](url) -> text: url
     text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1: \2', text)
     return text.strip()
