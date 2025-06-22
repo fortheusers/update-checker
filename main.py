@@ -88,9 +88,10 @@ def stripMarkdown(text):
     if not text:
         return ""
     # chop off 'Full Changelog' (GH appends on some releases)
-    match = "Full Changelog: https://github.com"
-    if text.find(match) >= 0:
-        text = text[:text.find(match)]
+    match = "**Full Changelog**: https://github.com/"
+    matchIdx = text.find(match)
+    if matchIdx >= 0:
+        text = text[:matchIdx]
     # convert asterisks with a space after to dashes
     # (GH uses * for bullets in some contexts)
     text = re.sub(r'\* ', '- ', text)
@@ -98,8 +99,13 @@ def stripMarkdown(text):
     text = text.replace("*", "").replace("`", "").replace("~", "").replace("#", "")
     # if there's an image, just remove it too
     text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
+    # remove any links with empty text
+    text = re.sub(r'\[ *\]\(.*?\)', '', text)
     # extract out links, [text](url) -> text: url
     text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1: \2', text)
+    # remove horizontal line breaks
+    text = text.replace("---", "").replace("___", "")
+    # any remaining whitespace
     return text.strip()
 
 def escapeNewlines(text):
