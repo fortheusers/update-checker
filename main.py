@@ -209,8 +209,10 @@ def createPR(package, releaseData):
         # compare it to one of the release assets, and take
         # the one with the closest levenstein distance
         for curAsset in pkgbuild.get("assets", []):
-            # only process github asset URLs
-            if not curAsset.get("url", "").startswith("https://github.com/"):
+            # only process github asset URLs from the same user/repo
+            releaseUrl = releaseData.get("html_url", "")
+            curUser, curRepo = releaseUrl.split("/")[3:5]
+            if not curAsset.get("url", "").startswith(f"https://github.com/{curUser}/{curRepo}/"):
                 continue
             # also skip any icon/banner/screenshot types
             if curAsset.get("type", "") in ["icon", "banner", "screenshot"]:
